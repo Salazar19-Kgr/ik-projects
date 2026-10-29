@@ -1,8 +1,9 @@
 import { auth, select, insert, setJwt, esc, fmtVes, configured } from './api.js';
 
 const $ = (s) => document.querySelector(s);
-const toast = (m) => { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), 3500); };
+const toast = (m) => { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), 6000); };
 const show = (id) => { for (const x of ['paso-correo', 'paso-codigo', 'panel-admin']) $('#' + x).hidden = x !== id; };
+const motivo = (e) => String(e && e.message ? e.message : e).slice(0, 90);
 let correo = '';
 
 async function cargarTasas() {
@@ -16,7 +17,7 @@ $('#enviar').onclick = async () => {
   if (!/^\S+@\S+\.\S+$/.test(correo)) return toast('Escribe un correo válido.');
   $('#enviar').disabled = true;
   try { await auth('otp', { email: correo, create_user: true }); show('paso-codigo'); }
-  catch (e) { toast(/database|signup|not allowed|422|500/i.test(e.message) ? 'Correo no autorizado.' : 'No se pudo enviar el código. Espera un momento e intenta de nuevo.'); }
+  catch (e) { toast(/database|signup|not allowed|422|500/i.test(e.message) ? 'Correo no autorizado.' : 'No se pudo enviar el código: ' + motivo(e)); }
   $('#enviar').disabled = false;
 };
 
@@ -24,15 +25,17 @@ $('#entrar').onclick = async () => {
   const token = $('#codigo').value.replace(/\s/g, '');
   if (!token) return toast('Escribe el código.');
   $('#entrar').disabled = true;
+  let r;
   try {
-    let r;
     try { r = await auth('verify', { type: 'email', email: correo, token }); }
     catch { r = await auth('verify', { type: 'signup', email: correo, token }); }
-    setJwt(r.access_token);
+  } catch (e) { $('#entrar').disabled = false; return toast('Código incorrecto o vencido: ' + motivo(e)); }
+  setJwt(r.access_token);
+  try {
     const perfil = (await select('profiles?select=role&limit=1'))[0];
-    if (!perfil || perfil.role !== 'admin') { setJwt(null); show('paso-correo'); return toast('Esta cuenta no tiene permisos de administración.'); }
-    show('panel-admin'); await cargarTasas();
-  } catch { toast('Código incorrecto o vencido.'); }
+    if (!perfil || perfil.role !== 'admin') { setJwt(null); show('paso-correo'); toast('Esta cuenta no tiene permisos de administración.'); }
+    else { show('panel-admin'); await cargarTasas(); }
+  } catch (e) { toast('El código era correcto, pero falló la base de datos: ' + motivo(e)); }
   $('#entrar').disabled = false;
 };
 
@@ -43,7 +46,7 @@ $('#guardar').onclick = async () => {
   if (!Number.isFinite(n) || n <= 0 || n > 1e9) return toast('Escribe una tasa válida.');
   $('#guardar').disabled = true;
   try { await insert('exchange_rates', { rate_ves: n, source: 'BCV' }); $('#tasa').value = ''; toast('Tasa guardada'); await cargarTasas(); }
-  catch { toast('No se pudo guardar la tasa.'); }
+  catch (e) { toast('No se pudo guardar la tasa: ' + motivo(e)); }
   $('#guardar').disabled = false;
 };
 
