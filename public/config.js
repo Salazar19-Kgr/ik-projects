@@ -1,1 +1,1 @@
-window.IK_CONFIG = { SUPABASE_URL: 'https://TU-ID-DE-PROYECTO.supabase.co', SUPABASE_ANON_KEY: 'TU_CLAVE_PUBLISHABLE' };
+window.IK_CONFIG = { SUPABASE_URL: 'https://ik-proyects.supabase.co', SUPABASE_ANON_KEY: 'sb_publishable_U6L0jMjk02tlnOISOqaoOg_eKqr199T' };
