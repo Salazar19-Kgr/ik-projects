@@ -1,0 +1,12 @@
+{
+  "name": "ik-restaurante",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Plataforma integral para restaurante: menú QR, cocina, pagos y administración.",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "db:build": "sh scripts/build-sql.sh",
+    "db:test": "sh scripts/test-db.sh"
+  },
+  "engines": { "node": ">=20" }
+}
