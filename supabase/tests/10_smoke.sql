@@ -57,8 +57,8 @@ begin
   assert public.create_service_call(v_token, 'mesero') = public.create_service_call(v_token, 'mesero'), 'llamada duplicada';
 
   -- 7) Cambios de estado según rol
-  insert into auth.users (id) values (v_admin), (v_cocina);
-  insert into public.profiles (id, full_name, role) values (v_admin, 'Admin Prueba', 'admin'), (v_cocina, 'Cocina Prueba', 'cocina');
+  insert into public.allowed_emails (email, role) values ('admin@prueba.local','admin'),('cocina@prueba.local','cocina');
+  insert into auth.users (id, email) values (v_admin,'admin@prueba.local'),(v_cocina,'cocina@prueba.local');
 
   perform set_config('request.jwt.claim.sub', v_cocina::text, true);
   perform public.advance_order_status(v_order, 'en_preparacion');

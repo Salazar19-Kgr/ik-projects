@@ -56,3 +56,7 @@ git add . && git commit -m "feat: base de datos (fase 1)" && git push origin mai
 ## Pruebas
 
 `sh scripts/test-db.sh` aplica migraciones y pruebas sobre un PostgreSQL (requiere `psql` y `DATABASE_URL`). GitHub Actions lo ejecuta en cada cambio.
+
+## Acceso del administrador (reemplaza los pasos 5 y 6 de arriba)
+
+El acceso es por código enviado al correo. Solo los correos de la tabla `allowed_emails` pueden registrarse (migración 0006); el resto es rechazado. El perfil y el rol se crean solos. La tasa de cambio **no** se escribe a mano: se gestiona desde el panel de administración.
