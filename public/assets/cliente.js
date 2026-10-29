@@ -84,7 +84,7 @@ setInterval(() => { if (S.view === 'orders') refreshOrders(); }, 8000);
 
 (async function init() {
   if (!configured()) return aviso('Falta configurar la conexión del sistema.');
-  if (!token) return aviso('Escanea el código QR de tu mesa para ver el menú.');
+  if (!token) return inicio();
   try {
     const t = (await rpc('resolve_table', { p_token: token }))[0];
     if (!t) return aviso('Este código QR no es válido. Pide ayuda al personal.');
@@ -96,3 +96,8 @@ setInterval(() => { if (S.view === 'orders') refreshOrders(); }, 8000);
     $('#app').hidden = false; $('#aviso').hidden = true;
   } catch (e) { aviso(ERR[e.message] || 'No pudimos cargar el menú. Revisa tu conexión.'); }
 })();
+
+function inicio() {
+  $('#app').hidden = true;
+  $('#aviso').innerHTML = '<h1 style="font-size:36px;margin-bottom:10px">Bienvenido</h1><p>Si eres cliente, escanea el código QR de tu mesa para ver el menú y hacer tu pedido.</p><a class="cta" style="display:block;text-decoration:none;text-align:center;margin-top:26px" href="/admin/">Entrar a administración</a>';
+}

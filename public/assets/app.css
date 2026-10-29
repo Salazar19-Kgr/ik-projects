@@ -71,3 +71,16 @@ textarea{min-height:70px;resize:none}
 [hidden]{display:none!important}
 @keyframes subir{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.tabs{display:flex;gap:8px;overflow-x:auto;padding:12px 0 14px;scrollbar-width:none}
+.tabs button{white-space:nowrap;padding:8px 18px;border-radius:99px;background:var(--papel);border:1px solid var(--borde);font-weight:600;font-size:14px;color:var(--suave);transition:.2s}
+.tabs .act{background:var(--verde);color:#fff;border-color:var(--verde)}
+.fila-admin{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--papel);border:1px solid var(--borde);border-radius:14px;padding:12px;margin-bottom:10px;animation:subir .4s both}
+.fila-admin small{display:block;color:var(--suave)}
+.acc{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.mini{display:inline-block;text-decoration:none;font-size:13px;font-weight:600;padding:7px 12px;border-radius:99px;border:1.5px solid var(--verde);color:var(--verde);background:none}
+.mini.off{border-color:var(--terra);color:var(--terra)}
+.precio{width:84px;margin:0;padding:7px 10px}
+.sub{font-size:18px;margin:22px 0 10px}
+.form{display:grid}
+select{width:100%;font:inherit;padding:12px 14px;border:1.5px solid var(--borde);border-radius:14px;background:var(--papel);margin-top:14px}
+main.adm h2{font-size:26px;margin:18px 0 6px}

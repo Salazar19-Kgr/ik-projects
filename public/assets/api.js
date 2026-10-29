@@ -36,3 +36,4 @@ export const ERR = {
   rate_limited: 'Demasiados pedidos seguidos. Espera un momento.',
   Failed: 'Sin conexión. Intenta de nuevo.',
 };
+export const patch = (q, row) => call('/rest/v1/' + q, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(row) });
