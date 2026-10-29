@@ -84,3 +84,23 @@ textarea{min-height:70px;resize:none}
 .form{display:grid}
 select{width:100%;font:inherit;padding:12px 14px;border:1.5px solid var(--borde);border-radius:14px;background:var(--papel);margin-top:14px}
 main.adm h2{font-size:26px;margin:18px 0 6px}
+#aviso:empty{display:none}
+.sk-wrap{max-width:720px;margin:0 auto;padding:24px 20px}
+.sk{height:132px;border-radius:var(--r);margin-bottom:14px;background:linear-gradient(90deg,#efe8db 25%,#f8f3ea 50%,#efe8db 75%);background-size:200% 100%;animation:brillo 1.2s infinite linear}
+#app:not([hidden]) ~ #cargando,#aviso:not(:empty) ~ #cargando{display:none}
+@keyframes brillo{to{background-position:-200% 0}}
+@keyframes aparecer{from{opacity:0}to{opacity:1}}
+.foto img{animation:aparecer .7s both;transition:transform .5s}
+.card:hover .foto img,.card:active .foto img{transform:scale(1.08)}
+.pago{background:var(--papel);border:1px solid var(--borde);border-radius:14px;padding:12px 14px;margin-bottom:10px;animation:subir .4s both}
+.pago small{margin-left:8px;color:var(--verde);font-weight:600}
+.pago p{color:var(--suave);font-size:14px;margin-top:4px;white-space:pre-line}
+#vista>*{animation:subir .4s both}
+.mini-foto{flex:0 0 56px;height:56px;border-radius:12px;overflow:hidden;background:var(--verde2);display:grid;place-items:center;font:600 22px var(--serif);color:var(--verde)}
+.mini-foto img{width:100%;height:100%;object-fit:cover}
+.grow{flex:1;min-width:0}
+.exito{position:fixed;inset:0;z-index:30;display:grid;place-items:center;background:rgba(251,247,240,.85);animation:aparecer .25s both;pointer-events:none}
+.exito svg circle{stroke-dasharray:151;stroke-dashoffset:151;animation:trazo .6s .1s forwards}
+.exito svg path{stroke-dasharray:40;stroke-dashoffset:40;animation:trazo .4s .6s forwards}
+@keyframes trazo{to{stroke-dashoffset:0}}
+@media (prefers-reduced-motion:reduce){.exito svg *{stroke-dashoffset:0!important}}

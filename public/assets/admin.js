@@ -103,3 +103,61 @@ document.addEventListener('click', async (e) => {
     catch { setJwt(null); try { sessionStorage.removeItem('ik_jwt'); } catch { /* nada */ } }
   }
 })();
+
+import { imgUrl, upload } from './api.js';
+
+VISTAS.pagos = async function () {
+  const rows = await select('payment_methods?select=id,kind,label,currency,instructions,active&order=sort_order,created_at');
+  const lista = rows.map((p) => `<div class="fila-admin" style="display:block"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><div><b>${esc(p.label)}</b><small>${p.currency === 'VES' ? 'Bolívares' : 'Dólares'}</small></div><button class="mini ${p.active ? '' : 'off'}" data-pact="${esc(p.id)}" data-val="${p.active}">${p.active ? 'Visible' : 'Oculto'}</button></div><textarea id="pi-${esc(p.id)}" maxlength="1000" placeholder="Instrucciones para el cliente">${esc(p.instructions)}</textarea><button class="mini" style="margin-top:8px" data-pins="${esc(p.id)}">Guardar instrucciones</button></div>`).join('');
+  return `<h2>Formas de pago</h2><p class="hint">Lo que dejes visible aquí lo ven los clientes en su mesa. Escribe solo datos que quieras que sean públicos.</p>${lista}<h3 class="sub">Agregar forma de pago</h3><div class="form"><select id="pm-k"><option value="pago_movil">Pago móvil</option><option value="transferencia_ves">Transferencia (Bs.)</option><option value="zelle">Zelle</option><option value="efectivo_usd">Efectivo USD</option><option value="efectivo_ves">Efectivo Bs.</option><option value="tarjeta">Tarjeta</option><option value="otro">Otro</option></select><input id="pm-l" placeholder="Nombre (ej: Pago móvil Banesco)"><select id="pm-c"><option value="VES">Bolívares</option><option value="USD">Dólares</option></select><textarea id="pm-i" maxlength="1000" placeholder="Datos para pagar (banco, teléfono, cédula o RIF...)"></textarea><button class="cta" data-acc="pago" style="margin-top:14px">Agregar</button></div>`;
+};
+
+VISTAS.menu = async function () {
+  const [cats, prods] = await Promise.all([select('categories?select=id,name&order=sort_order'), select('products?select=id,category_id,name,price_usd,available,image_path&order=sort_order')]);
+  const opts = cats.map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
+  const fila = (p) => {
+    const img = imgUrl(p.image_path);
+    return `<div class="fila-admin"><div class="mini-foto">${img ? `<img src="${esc(img)}" alt="">` : esc(p.name.charAt(0))}</div><div class="grow"><b>${esc(p.name)}</b><small>${fmtUsd(p.price_usd)}</small><div class="acc" style="justify-content:flex-start;margin-top:8px"><input class="precio" id="pr-${esc(p.id)}" inputmode="decimal" value="${Number(p.price_usd).toFixed(2)}"><button class="mini" data-precio="${esc(p.id)}">Guardar</button><label class="mini" for="ph-${esc(p.id)}">Foto</label><input type="file" accept="image/*" id="ph-${esc(p.id)}" data-foto="${esc(p.id)}" hidden><button class="mini ${p.available ? '' : 'off'}" data-disp="${esc(p.id)}" data-val="${p.available}">${p.available ? 'Disponible' : 'Agotado'}</button></div></div></div>`;
+  };
+  const lista = cats.map((c) => `<h3 class="sub">${esc(c.name)}</h3>` + prods.filter((p) => p.category_id === c.id).map(fila).join('')).join('');
+  return `<h2>Menú</h2>${lista}<h3 class="sub">Agregar categoría</h3><div class="form"><input id="nc" placeholder="Nombre de la categoría"><button class="cta" data-acc="cat" style="margin-top:14px">Agregar categoría</button></div><h3 class="sub">Agregar plato</h3><div class="form"><select id="np-cat">${opts}</select><input id="np-n" placeholder="Nombre del plato"><input id="np-d" placeholder="Descripción"><input id="np-p" inputmode="decimal" placeholder="Precio en USD (ej: 8.50)"><button class="cta" data-acc="plato" style="margin-top:14px">Agregar plato</button></div>`;
+};
+
+async function reducir(file) {
+  const bmp = await createImageBitmap(file);
+  const k = Math.min(1, 1000 / Math.max(bmp.width, bmp.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(bmp.width * k);
+  c.height = Math.round(bmp.height * k);
+  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+  return new Promise((ok, no) => c.toBlob((b) => (b ? ok(b) : no(new Error('No se pudo procesar la foto'))), 'image/jpeg', 0.82));
+}
+
+document.addEventListener('click', async (e) => {
+  const t = e.target.closest('[data-pact],[data-pins],[data-acc="pago"]');
+  if (!t) return;
+  const d = t.dataset;
+  try {
+    if ('pact' in d) { await patch('payment_methods?id=eq.' + encodeURIComponent(d.pact), { active: d.val !== 'true' }); return render(); }
+    if ('pins' in d) { await patch('payment_methods?id=eq.' + encodeURIComponent(d.pins), { instructions: $('#pi-' + d.pins).value.trim() }); return toast('Instrucciones guardadas'); }
+    const label = $('#pm-l').value.trim();
+    if (!label) return toast('Escribe el nombre.');
+    await insert('payment_methods', { kind: $('#pm-k').value, label, currency: $('#pm-c').value, instructions: $('#pm-i').value.trim(), sort_order: 99 });
+    toast('Forma de pago agregada');
+    return render();
+  } catch (err) { toast('No se pudo completar: ' + motivo(err)); }
+});
+
+document.addEventListener('change', async (e) => {
+  const id = e.target.dataset && e.target.dataset.foto;
+  if (!id || !e.target.files[0]) return;
+  toast('Subiendo foto…');
+  try {
+    const blob = await reducir(e.target.files[0]);
+    const path = `${id}-${Date.now()}.jpg`;
+    await upload(path, blob);
+    await patch('products?id=eq.' + encodeURIComponent(id), { image_path: path });
+    toast('Foto actualizada');
+    render();
+  } catch (err) { toast('No se pudo subir la foto: ' + motivo(err)); }
+});

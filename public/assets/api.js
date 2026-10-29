@@ -37,3 +37,11 @@ export const ERR = {
   Failed: 'Sin conexión. Intenta de nuevo.',
 };
 export const patch = (q, row) => call('/rest/v1/' + q, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(row) });
+export async function upload(path, blob) {
+  const res = await fetch(`${U}/storage/v1/object/menu-images/${path}`, {
+    method: 'POST',
+    headers: { apikey: K, Authorization: 'Bearer ' + jwt, 'Content-Type': blob.type, 'x-upsert': 'true' },
+    body: blob,
+  });
+  if (!res.ok) throw new Error('No se pudo subir la foto (' + res.status + ')');
+}

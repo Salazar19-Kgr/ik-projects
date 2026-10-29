@@ -32,11 +32,11 @@ function cartHtml() {
   if (!S.cart.size) return '<p class="vacio">Aún no has agregado platos.</p>';
   const lines = [...S.cart.values()].map(({ p, qty }) => `<div class="line"><div><b>${esc(p.name)}</b><small>${fmtUsd(p.price_usd)} c/u</small></div><div class="qty"><button data-dec="${esc(p.id)}" aria-label="Quitar uno">−</button><span>${qty}</span><button data-inc="${esc(p.id)}" aria-label="Agregar uno">+</button></div></div>`).join('');
   return `${lines}<textarea id="nota" maxlength="300" placeholder="Instrucciones especiales (opcional)">${esc(S.nota)}</textarea>
-  <div class="tot"><span>Subtotal</span><b>${price(subtotal())}</b></div><p class="hint">Los impuestos y el total final los calcula el sistema al enviar.</p><button class="cta" data-send>Enviar pedido</button>`;
+  <div class="tot"><span>Subtotal</span><b>${price(subtotal())}</b></div><p class="hint">Los impuestos y el total final los calcula el sistema al enviar.</p>${pagosHtml()}<button class="cta" data-send>Enviar pedido</button>`;
 }
 function ordersHtml() {
   const list = S.orders.length ? S.orders.map((o) => `<div class="ped ${esc(o.status)}"><div class="ph"><b>Pedido #${Number(o.number)}</b><span class="est">${ESTADOS[o.status] || esc(o.status)}</span></div><ul>${o.items.map((i) => `<li>${Number(i.quantity)}× ${esc(i.name)}</li>`).join('')}</ul><small>Total ${fmtUsd(o.total_usd)} · ${fmtVes(o.total_ves)}</small></div>`).join('') : '<p class="vacio">Todavía no tienes pedidos en esta mesa.</p>';
-  return list + '<button class="ghost" data-call>Llamar al mesero</button>';
+  return list + pagosHtml() + '<button class="ghost" data-call>Llamar al mesero</button>';
 }
 function renderSheet() {
   const nota = $('#nota'); if (nota) S.nota = nota.value;
@@ -55,7 +55,7 @@ async function send() {
     const nota = ($('#nota')?.value || '').trim();
     const items = [...S.cart.values()].map(({ p, qty }) => ({ product_id: p.id, quantity: qty }));
     await rpc('create_order', { p_token: token, p_items: items, p_notes: nota });
-    S.cart.clear(); S.nota = ''; renderBar(); toast('¡Pedido enviado a cocina!'); openSheet('orders');
+    S.cart.clear(); S.nota = ''; renderBar(); exito(); toast('¡Pedido enviado a cocina!'); openSheet('orders');
   } catch (e) { fail(e); btn.disabled = false; }
 }
 
@@ -100,4 +100,22 @@ setInterval(() => { if (S.view === 'orders') refreshOrders(); }, 8000);
 function inicio() {
   $('#app').hidden = true;
   $('#aviso').innerHTML = '<h1 style="font-size:36px;margin-bottom:10px">Bienvenido</h1><p>Si eres cliente, escanea el código QR de tu mesa para ver el menú y hacer tu pedido.</p><a class="cta" style="display:block;text-decoration:none;text-align:center;margin-top:26px" href="/admin/">Entrar a administración</a>';
+}
+
+S.pagos = [];
+function pagosHtml() {
+  const lista = S.pagos || [];
+  if (!lista.length) return '';
+  return '<h3 class="sub">Formas de pago</h3>' + lista.map((p) => `<div class="pago"><b>${esc(p.label)}</b><small>${p.currency === 'VES' ? 'Bolívares' : 'Dólares'}</small><p>${esc(p.instructions)}</p></div>`).join('');
+}
+async function cargarPagos() {
+  try { S.pagos = await select('payment_methods?select=label,currency,instructions&order=sort_order'); if (S.view) renderSheet(); } catch { /* sin formas de pago */ }
+}
+cargarPagos();
+function exito() {
+  const d = document.createElement('div');
+  d.className = 'exito';
+  d.innerHTML = '<svg viewBox="0 0 52 52" width="96" height="96"><circle cx="26" cy="26" r="24" fill="none" stroke="#2E6B55" stroke-width="3"/><path d="M15 27l8 8 14-16" fill="none" stroke="#2E6B55" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  document.body.appendChild(d);
+  setTimeout(() => d.remove(), 1500);
 }
