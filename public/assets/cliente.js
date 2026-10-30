@@ -28,13 +28,13 @@ function renderBar() {
   b.classList.toggle('on', n > 0);
   b.innerHTML = `<span>${n} ${n === 1 ? 'plato' : 'platos'}</span><b>${fmtUsd(subtotal())}</b><span>Ver pedido →</span>`;
 }
-function cartHtml() {
+function cartHtmlViejo() {
   if (!S.cart.size) return '<p class="vacio">Aún no has agregado platos.</p>';
   const lines = [...S.cart.values()].map(({ p, qty }) => `<div class="line"><div><b>${esc(p.name)}</b><small>${fmtUsd(p.price_usd)} c/u</small></div><div class="qty"><button data-dec="${esc(p.id)}" aria-label="Quitar uno">−</button><span>${qty}</span><button data-inc="${esc(p.id)}" aria-label="Agregar uno">+</button></div></div>`).join('');
   return `${lines}<textarea id="nota" maxlength="300" placeholder="Instrucciones especiales (opcional)">${esc(S.nota)}</textarea>
   <div class="tot"><span>Subtotal</span><b>${price(subtotal())}</b></div><p class="hint">Los impuestos y el total final los calcula el sistema al enviar.</p>${pagosHtml()}<button class="cta" data-send>Enviar pedido</button>`;
 }
-function ordersHtml() {
+function ordersHtmlViejo() {
   const list = S.orders.length ? S.orders.map((o) => `<div class="ped ${esc(o.status)}"><div class="ph"><b>Pedido #${Number(o.number)}</b><span class="est">${ESTADOS[o.status] || esc(o.status)}</span></div><ul>${o.items.map((i) => `<li>${Number(i.quantity)}× ${esc(i.name)}</li>`).join('')}</ul><small>Total ${fmtUsd(o.total_usd)} · ${fmtVes(o.total_ves)}</small></div>`).join('') : '<p class="vacio">Todavía no tienes pedidos en esta mesa.</p>';
   return list + pagosHtml() + '<button class="ghost" data-call>Llamar al mesero</button>';
 }
@@ -49,7 +49,7 @@ async function refreshOrders() {
 function openSheet(v) { S.view = v; renderSheet(); $('#sheet').classList.add('on'); document.body.classList.add('noscroll'); if (v === 'orders') refreshOrders(); }
 function closeSheet() { S.view = null; $('#sheet').classList.remove('on'); document.body.classList.remove('noscroll'); }
 
-async function send() {
+async function sendViejo() {
   const btn = $('[data-send]'); btn.disabled = true;
   try {
     const nota = ($('#nota')?.value || '').trim();
@@ -99,7 +99,7 @@ setInterval(() => { if (S.view === 'orders') refreshOrders(); }, 8000);
 
 function inicio() {
   $('#app').hidden = true;
-  $('#aviso').innerHTML = '<h1 style="font-size:36px;margin-bottom:10px">Bienvenido</h1><p>Si eres cliente, escanea el código QR de tu mesa para ver el menú y hacer tu pedido.</p><a class="cta" style="display:block;text-decoration:none;text-align:center;margin-top:26px" href="/admin/">Entrar a administración</a>';
+  $('#aviso').innerHTML = '<h1 style="font-size:36px;margin-bottom:10px">Bienvenido</h1><p>Si eres cliente, escanea el código QR de tu mesa para ver el menú y hacer tu pedido.</p><a class="cta" style="display:block;text-decoration:none;text-align:center;margin-top:26px" href="/admin/">Entrar a administración</a><a class="ghost" style="display:block;text-decoration:none;text-align:center" href="/cocina/">Pantalla de cocina</a>';
 }
 
 S.pagos = [];
@@ -232,3 +232,51 @@ document.addEventListener('click', (e) => {
   if (e.target.closest('[data-enviarpago]')) enviarPago();
 });
 document.addEventListener('change', (e) => { if (e.target.id === 'pg-m') actualizarMetodo(); });
+
+const PASOS = [['recibido', 'Recibido'], ['en_preparacion', 'Preparando'], ['listo', 'Listo'], ['entregado', 'Entregado']];
+function pasosHtml(status) {
+  if (status === 'cancelado') return '<p class="cancel">Pedido cancelado</p>';
+  const idx = status === 'entregado' ? PASOS.length : PASOS.findIndex(([k]) => k === status);
+  return '<ol class="pasos">' + PASOS.map(([, t], i) => `<li class="${i < idx ? 'hecho' : i === idx ? 'actual' : ''}"><span>${i < idx ? '✓' : i + 1}</span><small>${t}</small></li>`).join('') + '</ol>';
+}
+
+const CHIPS = ['Sin cebolla', 'Sin picante', 'Extra salsa', 'Bien cocido'];
+function cartHtml() {
+  if (!S.cart.size) return '<p class="vacio">Aún no has agregado platos.</p>';
+  const lines = [...S.cart.values()].map(({ p, qty, nota }) => `<div class="linea"><div class="line"><div><b>${esc(p.name)}</b><small>${fmtUsd(p.price_usd)} c/u</small></div><div class="qty"><button data-dec="${esc(p.id)}" aria-label="Quitar uno">−</button><span>${qty}</span><button data-inc="${esc(p.id)}" aria-label="Agregar uno">+</button></div></div><input class="lnota" data-nota="${esc(p.id)}" maxlength="200" placeholder="¿Algo más para este plato? (ej: sin cebolla)" value="${esc(nota || '')}"><div class="chips">${CHIPS.map((c) => `<button data-chip="${esc(p.id)}" data-t="${esc(c)}">${esc(c)}</button>`).join('')}</div></div>`).join('');
+  return `${lines}<textarea id="nota" maxlength="300" placeholder="Nota general para todo el pedido (opcional)">${esc(S.nota)}</textarea>
+  <div class="tot"><span>Subtotal</span><b>${price(subtotal())}</b></div><p class="hint">Los impuestos y el total final los calcula el sistema al enviar.</p><button class="cta" data-send>Enviar pedido</button>`;
+}
+
+function ordersHtml() {
+  const list = S.orders.length ? S.orders.map((o) => `<div class="ped ${esc(o.status)}"><div class="ph"><b>Pedido #${Number(o.number)}</b><span class="est">${ESTADOS[o.status] || esc(o.status)}</span></div>${pasosHtml(o.status)}<ul>${o.items.map((i) => `<li>${Number(i.quantity)}× ${esc(i.name)}${i.notes ? `<em> — ${esc(i.notes)}</em>` : ''}</li>`).join('')}</ul><small>Total ${fmtUsd(o.total_usd)} · ${fmtVes(o.total_ves)}</small></div>`).join('') : '<p class="vacio">Todavía no tienes pedidos en esta mesa.</p>';
+  return list + '<button class="ghost" data-call>Llamar al mesero</button>';
+}
+
+async function send() {
+  const btn = $('[data-send]');
+  btn.disabled = true;
+  try {
+    const nota = ($('#nota')?.value || '').trim();
+    const items = [...S.cart.values()].map(({ p, qty, nota: n }) => ({ product_id: p.id, quantity: qty, notes: (n || '').trim() }));
+    await rpc('create_order', { p_token: token, p_items: items, p_notes: nota });
+    S.cart.clear(); S.nota = ''; renderBar(); exito(); toast('¡Pedido enviado a cocina!'); openSheet('orders');
+  } catch (e) { fail(e); btn.disabled = false; }
+}
+
+document.addEventListener('input', (e) => {
+  const id = e.target.dataset && e.target.dataset.nota;
+  if (!id) return;
+  const l = S.cart.get(id);
+  if (l) l.nota = e.target.value;
+});
+document.addEventListener('click', (e) => {
+  const c = e.target.closest('[data-chip]');
+  if (!c) return;
+  const l = S.cart.get(c.dataset.chip);
+  if (!l) return;
+  const base = (l.nota || '').trim();
+  if (base.toLowerCase().includes(c.dataset.t.toLowerCase())) return;
+  l.nota = (base ? base + ', ' : '') + c.dataset.t;
+  renderSheet();
+});
