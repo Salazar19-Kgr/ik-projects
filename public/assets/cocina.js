@@ -2,7 +2,7 @@ import { auth, select, rpc, setJwt, esc, configured } from './api.js';
 
 const $ = (s) => document.querySelector(s);
 const toast = (m) => { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), 4500); };
-const show = (id) => { for (const x of ['paso-correo', 'paso-codigo', 'panel']) $('#' + x).hidden = x !== id; };
+const show = (id) => { for (const x of ['paso-correo', 'paso-codigo', 'panel-cocina']) $('#' + x).hidden = x !== id; };
 const motivo = (e) => String(e && e.message ? e.message : e).slice(0, 90);
 let correo = '', rol = null, tab = 'recibido', timer = null, ultimos = -1;
 
@@ -60,8 +60,8 @@ async function entrar(jwt) {
   const perfil = (await select('profiles?select=role&limit=1'))[0];
   if (!perfil) { setJwt(null); throw new Error('sin_permiso'); }
   rol = perfil.role;
-  try { sessionStorage.setItem('ik_jwt', jwt); } catch { /* sin almacenamiento */ }
-  show('panel');
+  try { sessionStorage.setItem('ik_jwt_cocina', jwt); } catch { /* sin almacenamiento */ }
+  show('panel-cocina');
   try { if (navigator.wakeLock) navigator.wakeLock.request('screen'); } catch { /* sin wake lock */ }
   await cargar();
   clearInterval(timer);
@@ -97,7 +97,7 @@ $('#entrar').onclick = async () => {
 document.addEventListener('click', async (e) => {
   const t = e.target.closest('[data-col],[data-mover],#salir');
   if (!t) return;
-  if (t.id === 'salir') { try { sessionStorage.removeItem('ik_jwt'); } catch { /* nada */ } location.reload(); return; }
+  if (t.id === 'salir') { try { sessionStorage.removeItem('ik_jwt_cocina'); } catch { /* nada */ } location.reload(); return; }
   if (t.dataset.col) { tab = t.dataset.col; return cargar(); }
   const a = t.dataset.a;
   let razon = null;
@@ -113,9 +113,9 @@ document.addEventListener('click', async (e) => {
 (async () => {
   if (!configured()) { toast('Falta configurar la conexión (config.js).'); return; }
   let j = null;
-  try { j = sessionStorage.getItem('ik_jwt'); } catch { /* nada */ }
+  try { j = sessionStorage.getItem('ik_jwt_cocina'); } catch { /* nada */ }
   if (j) {
     try { await entrar(j); }
-    catch { setJwt(null); try { sessionStorage.removeItem('ik_jwt'); } catch { /* nada */ } }
+    catch { setJwt(null); try { sessionStorage.removeItem('ik_jwt_cocina'); } catch { /* nada */ } }
   }
 })();

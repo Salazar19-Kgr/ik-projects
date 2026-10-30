@@ -99,7 +99,7 @@ setInterval(() => { if (S.view === 'orders') refreshOrders(); }, 8000);
 
 function inicio() {
   $('#app').hidden = true;
-  $('#aviso').innerHTML = '<h1 style="font-size:36px;margin-bottom:10px">Bienvenido</h1><p>Si eres cliente, escanea el código QR de tu mesa para ver el menú y hacer tu pedido.</p><a class="cta" style="display:block;text-decoration:none;text-align:center;margin-top:26px" href="/admin/">Entrar a administración</a><a class="ghost" style="display:block;text-decoration:none;text-align:center" href="/cocina/">Pantalla de cocina</a>';
+  $('#aviso').innerHTML = '<h1 style="font-size:36px;margin-bottom:10px">Bienvenido</h1><p>Si eres cliente, escanea el código QR de tu mesa para ver el menú y hacer tu pedido.</p>';
 }
 
 S.pagos = [];

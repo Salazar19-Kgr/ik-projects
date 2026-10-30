@@ -42,7 +42,7 @@ async function entrar(jwt) {
   setJwt(jwt);
   const perfil = (await select('profiles?select=role&limit=1'))[0];
   if (!perfil || perfil.role !== 'admin') { setJwt(null); throw new Error('sin_permiso'); }
-  try { sessionStorage.setItem('ik_jwt', jwt); } catch { /* sin almacenamiento */ }
+  try { sessionStorage.setItem('ik_jwt_admin', jwt); } catch { /* sin almacenamiento */ }
   show('panel-admin');
   render();
 }
@@ -78,7 +78,7 @@ document.addEventListener('click', async (e) => {
   if (!t) return;
   const d = t.dataset;
   try {
-    if (t.id === 'salir') { try { sessionStorage.removeItem('ik_jwt'); } catch { /* nada */ } location.reload(); return; }
+    if (t.id === 'salir') { try { sessionStorage.removeItem('ik_jwt_admin'); } catch { /* nada */ } location.reload(); return; }
     if ('tab' in d) { tab = d.tab; return render(); }
     if ('copiar' in d) { await navigator.clipboard.writeText(d.copiar); return toast('Enlace copiado'); }
     if ('precio' in d) { const n = num($('#pr-' + d.precio).value); if (!n) return toast('Precio no válido.'); await patch('products?id=eq.' + encodeURIComponent(d.precio), { price_usd: n }); toast('Precio actualizado'); return render(); }
@@ -97,10 +97,10 @@ document.addEventListener('click', async (e) => {
 (async () => {
   if (!configured()) { toast('Falta configurar la conexión (config.js).'); return; }
   let j = null;
-  try { j = sessionStorage.getItem('ik_jwt'); } catch { /* nada */ }
+  try { j = sessionStorage.getItem('ik_jwt_admin'); } catch { /* nada */ }
   if (j) {
     try { await entrar(j); }
-    catch { setJwt(null); try { sessionStorage.removeItem('ik_jwt'); } catch { /* nada */ } }
+    catch { setJwt(null); try { sessionStorage.removeItem('ik_jwt_admin'); } catch { /* nada */ } }
   }
 })();
 
