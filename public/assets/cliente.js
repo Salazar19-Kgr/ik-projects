@@ -41,7 +41,7 @@ function ordersHtmlViejo() {
 function renderSheet() {
   const nota = $('#nota'); if (nota) S.nota = nota.value;
   const a = (v) => (S.view === v ? 'act' : '');
-  $('#panel').innerHTML = `<div class="stabs"><button data-view="cart" class="${a('cart')}">Tu pedido</button><button data-view="orders" class="${a('orders')}">Seguimiento</button><button data-view="pagar" class="${a("pagar")}">Pagar</button><button data-close aria-label="Cerrar">✕</button></div>` + (S.view === 'cart' ? cartHtml() : S.view === 'pagar' ? pagarHtml() : ordersHtml());
+  $('#panel').innerHTML = `<div class="stabs"><button data-view="cart" class="${a('cart')}">Tu pedido</button><button data-view="orders" class="${a('orders')}">Seguimiento</button><button data-view="pagar" class="${a("pagar")}">Pagar</button><button data-close aria-label="Cerrar">✕</button></div>` + pasoTitulo() + (S.view === 'cart' ? cartHtml() : S.view === 'pagar' ? pagarHtml() : ordersHtml());
 }
 async function refreshOrders() {
   try { S.orders = await rpc('get_table_orders', { p_token: token }); if (S.view === 'orders') renderSheet(); } catch (e) { if (S.view === 'orders') fail(e); }
@@ -280,3 +280,55 @@ document.addEventListener('click', (e) => {
   l.nota = (base ? base + ', ' : '') + c.dataset.t;
   renderSheet();
 });
+
+function pasoTitulo() {
+  const t = {
+    cart: ['2', 'Revisa y envía tu pedido', 'Si quieres algo especial en un plato, escríbelo debajo. Luego toca «Enviar pedido».'],
+    orders: ['3', 'Sigue tu pedido', 'Aquí ves cuándo está listo. Se actualiza solo.'],
+    pagar: ['4', 'Paga tu cuenta', 'Elige cómo pagar, llena tus datos y sube la foto del comprobante.'],
+  }[S.view];
+  if (!t) return '';
+  return `<div class="paso"><span>${t[0]}</span><div><b>Paso ${t[0]} de 4 · ${t[1]}</b><small>${t[2]}</small></div></div>`;
+}
+
+function actualizarGuia() {
+  const orders = S.orders || [];
+  const terminado = orders.length > 0 && orders.every((o) => o.status === 'entregado' || o.status === 'cancelado');
+  const paso = count() > 0 ? 2 : terminado ? 4 : orders.length ? 3 : 1;
+  document.querySelectorAll('.guia li:not(.ayuda)').forEach((li, i) => li.classList.toggle('on', i + 1 === paso));
+}
+setInterval(actualizarGuia, 700);
+setInterval(() => { if (token) refreshOrders(); }, 10000);
+if (token) refreshOrders();
+
+function tutorial() {
+  if (document.querySelector('.tuto')) return;
+  const d = document.createElement('div');
+  d.className = 'tuto';
+  d.innerHTML = '<div><h2>¿Cómo pedir?</h2><ol>'
+    + '<li><b>1</b><span>Elige lo que quieres<small>Toca el botón + en cada plato.</small></span></li>'
+    + '<li><b>2</b><span>Revisa y envía<small>Toca la barra oscura de abajo, escribe si quieres algo especial y envía.</small></span></li>'
+    + '<li><b>3</b><span>Espera tu pedido<small>En «Seguimiento» ves cuándo está listo.</small></span></li>'
+    + '<li><b>4</b><span>Paga cuando quieras<small>Toca «Pagar cuenta», elige cómo pagar y sube tu comprobante.</small></span></li>'
+    + '</ol><button class="cta" data-tutocerrar>Entendido, ¡a pedir!</button><button class="ghost" data-call>¿Dudas? Llamar al mesero</button></div>';
+  document.body.appendChild(d);
+}
+document.addEventListener('click', (e) => {
+  if (e.target.closest('[data-ayuda]')) tutorial();
+  if (e.target.closest('[data-tutocerrar]')) {
+    try { localStorage.setItem('ik_tuto', '1'); } catch { /* sin almacenamiento */ }
+    const d = document.querySelector('.tuto');
+    if (d) d.remove();
+  }
+});
+if (token) {
+  const espera = setInterval(() => {
+    if (!$('#app').hidden) {
+      clearInterval(espera);
+      let visto = false;
+      try { visto = !!localStorage.getItem('ik_tuto'); } catch { /* sin almacenamiento */ }
+      if (!visto) tutorial();
+    }
+  }, 400);
+  setTimeout(() => clearInterval(espera), 15000);
+}

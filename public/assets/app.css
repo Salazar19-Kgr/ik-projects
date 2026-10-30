@@ -164,3 +164,23 @@ main.lista{max-width:1000px;display:grid;gap:14px;grid-template-columns:repeat(a
 .tabs i{font-style:normal;margin-left:6px;background:rgba(0,0,0,.08);padding:0 7px;border-radius:99px}
 .tabs .act i{background:rgba(255,255,255,.25)}
 @keyframes latido{50%{box-shadow:0 0 0 5px rgba(192,57,43,.25)}}
+.guia li.on{background:var(--verde);color:#fff;border-color:var(--verde)}
+.guia li.on b{background:#fff;color:var(--verde)}
+.guia .ayuda{background:none;border-style:dashed;padding:6px 14px;cursor:pointer}
+.paso{display:flex;gap:12px;align-items:center;background:var(--verde2);border-radius:14px;padding:12px 14px;margin-bottom:12px;animation:subir .4s both}
+.paso span{flex:0 0 32px;height:32px;border-radius:50%;background:var(--verde);color:#fff;display:grid;place-items:center;font-weight:700}
+.paso small{display:block;color:var(--suave)}
+.tuto{position:fixed;inset:0;z-index:25;background:rgba(20,30,25,.55);display:grid;place-items:center;padding:20px;animation:aparecer .3s both}
+.tuto>div{background:var(--crema);border-radius:24px;padding:24px 20px;max-width:420px;width:100%;box-shadow:var(--sombra);animation:subir .4s both}
+.tuto h2{font-size:26px;margin-bottom:14px}
+.tuto ol{list-style:none;padding:0;display:grid;gap:14px;margin-bottom:18px}
+.tuto li{display:flex;gap:12px;align-items:flex-start}
+.tuto li b{flex:0 0 32px;height:32px;border-radius:50%;background:var(--verde);color:#fff;display:grid;place-items:center}
+.tuto li small{display:block;color:var(--suave)}
+.tk li.it{display:flex;gap:12px;align-items:center}
+.ft{flex:0 0 64px;height:64px;border-radius:12px;overflow:hidden;background:var(--verde2);display:grid;place-items:center;font-size:30px}
+.ft img{width:100%;height:100%;object-fit:cover}
+.tx{min-width:0}
+.tx b{font-size:17px}
+.tx small{display:block;color:var(--suave);font-size:13px}
+.tk .tx em{background:#FBE9D3;color:#8a4a1c;padding:4px 8px;border-radius:8px;margin-top:4px}

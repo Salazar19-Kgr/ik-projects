@@ -32,7 +32,7 @@ function botones(o) {
   return b.join('') || '<small>Esperando al mesero…</small>';
 }
 
-function tarjeta(o) {
+function tarjetaVieja(o) {
   const m = minutos(o.created_at);
   const mesa = o.dining_tables ? (o.dining_tables.label || 'Mesa ' + o.dining_tables.number) : 'Mesa';
   const items = (o.order_items || []).map((i) => `<li><b>${Number(i.quantity)}×</b> ${esc(i.product_name)}${i.notes ? `<em>“${esc(i.notes)}”</em>` : ''}</li>`).join('');
@@ -42,7 +42,7 @@ function tarjeta(o) {
 async function cargar() {
   let rows;
   try {
-    rows = await select('orders?select=id,order_number,status,notes,created_at,dining_tables(number,label),order_items(product_name,quantity,notes)&status=in.(recibido,en_preparacion,listo)&order=created_at.asc&limit=100');
+    rows = await select('orders?select=id,order_number,status,notes,created_at,dining_tables(number,label),order_items(product_name,quantity,notes,products(image_path,description))&status=in.(recibido,en_preparacion,listo)&order=created_at.asc&limit=100');
   } catch (e) { $('#lista').innerHTML = '<p class="vacio">No se pudo cargar: ' + esc(motivo(e)) + '</p>'; return; }
   const nuevos = rows.filter((o) => o.status === 'recibido').length;
   if (ultimos >= 0 && nuevos > ultimos) alerta();
@@ -119,3 +119,19 @@ document.addEventListener('click', async (e) => {
     catch { setJwt(null); try { sessionStorage.removeItem('ik_jwt_cocina'); } catch { /* nada */ } }
   }
 })();
+
+import { imgUrl } from './api.js';
+
+const EMOJI = [[/combo/i, '🍱'], [/hamburg/i, '🍔'], [/perro|hot ?dog/i, '🌭'], [/pizza/i, '🍕'], [/papa|frita|aros/i, '🍟'], [/brownie|helado|postre/i, '🍰'], [/refresc|malta|jugo|papel[oó]n|bebida/i, '🥤'], [/teque/i, '🧀'], [/pabell/i, '🍛']];
+const icono = (n) => { const h = EMOJI.find(([r]) => r.test(n)); return h ? h[1] : '🍽️'; };
+
+function tarjeta(o) {
+  const m = minutos(o.created_at);
+  const mesa = o.dining_tables ? (o.dining_tables.label || 'Mesa ' + o.dining_tables.number) : 'Mesa';
+  const items = (o.order_items || []).map((i) => {
+    const p = i.products || {};
+    const img = imgUrl(p.image_path);
+    return `<li class="it"><div class="ft">${img ? `<img src="${esc(img)}" alt="">` : `<span>${icono(i.product_name)}</span>`}</div><div class="tx"><b>${Number(i.quantity)}× ${esc(i.product_name)}</b>${p.description ? `<small>${esc(p.description)}</small>` : ''}${i.notes ? `<em>Pedido especial: ${esc(i.notes)}</em>` : ''}</div></li>`;
+  }).join('');
+  return `<article class="tk ${m >= 15 ? 'tarde' : m >= 8 ? 'medio' : ''}"><div class="th"><b>${esc(mesa)}</b><span>#${Number(o.order_number)} · hace ${m} min</span></div><ul>${items}</ul>${o.notes ? `<p class="nota-pedido">Nota del pedido: ${esc(o.notes)}</p>` : ''}<div class="acc">${botones(o)}</div></article>`;
+}
