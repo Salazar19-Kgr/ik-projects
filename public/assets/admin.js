@@ -161,3 +161,41 @@ document.addEventListener('change', async (e) => {
     render();
   } catch (err) { toast('No se pudo subir la foto: ' + motivo(err)); }
 });
+
+import { rpc, signedUrl } from './api.js';
+
+const ESTADOS_PAGO = { pendiente: 'Pendiente', en_revision: 'En revisión', aprobado: 'Aprobado', rechazado: 'Rechazado', anulado: 'Anulado' };
+
+VISTAS.cobros = async function () {
+  const rows = await select('payments?select=id,amount,currency,amount_usd,reference,status,payer_name,payer_doc,created_at,payment_methods(label),checks(dining_tables(number)),payment_evidence(storage_path)&order=created_at.desc&limit=30');
+  if (!rows.length) return '<h2>Cobros</h2><p class="vacio">Aún no hay pagos registrados.</p>';
+  return '<h2>Cobros</h2><p class="hint">Confirma en tu banco que el dinero llegó antes de aprobar.</p>' + rows.map((p) => {
+    const ev = (p.payment_evidence || [])[0];
+    const mesa = p.checks && p.checks.dining_tables ? p.checks.dining_tables.number : '?';
+    const pend = p.status === 'en_revision' || p.status === 'pendiente';
+    const monto = p.currency === 'VES' ? fmtVes(p.amount) : fmtUsd(p.amount);
+    return `<div class="fila-admin" style="display:block"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>Mesa ${esc(mesa)} · ${esc(p.payment_methods ? p.payment_methods.label : '')}</b><span class="est">${esc(ESTADOS_PAGO[p.status] || p.status)}</span></div><small>${esc(p.payer_name || '')} · ${esc(p.payer_doc || '')}</small><small>${monto} (≈ ${fmtUsd(p.amount_usd)}) · Ref. ${esc(p.reference || '—')}</small><small>${esc(new Date(p.created_at).toLocaleString('es-VE'))}</small><div class="acc" style="justify-content:flex-start;margin-top:10px">${ev ? `<button class="mini" data-verfoto="${esc(ev.storage_path)}">Ver comprobante</button>` : ''}${pend ? `<button class="mini" data-aprobar="${esc(p.id)}">Aprobar</button><button class="mini off" data-rechazar="${esc(p.id)}">Rechazar</button>` : ''}</div></div>`;
+  }).join('');
+};
+
+document.addEventListener('click', async (e) => {
+  const t = e.target.closest('[data-verfoto],[data-aprobar],[data-rechazar]');
+  if (!t) return;
+  const d = t.dataset;
+  try {
+    if ('verfoto' in d) {
+      const w = window.open('about:blank');
+      const url = await signedUrl(d.verfoto);
+      if (w) w.location.href = url; else location.href = url;
+      return;
+    }
+    const aprobar = 'aprobar' in d;
+    const id = d.aprobar || d.rechazar;
+    let nota = null;
+    if (aprobar) { if (!confirm('¿Confirmas que el dinero ya llegó a tu cuenta?')) return; }
+    else { nota = prompt('Motivo del rechazo (opcional):'); if (nota === null) return; }
+    await rpc('review_payment', { p_payment_id: id, p_approve: aprobar, p_note: nota });
+    toast(aprobar ? 'Pago aprobado' : 'Pago rechazado');
+    render();
+  } catch (err) { toast('No se pudo completar: ' + motivo(err)); }
+});

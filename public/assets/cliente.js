@@ -12,7 +12,7 @@ const count = () => [...S.cart.values()].reduce((n, l) => n + l.qty, 0);
 const subtotal = () => [...S.cart.values()].reduce((n, l) => n + l.qty * Number(l.p.price_usd), 0);
 const aviso = (m) => { $('#app').hidden = true; $('#aviso').textContent = m; };
 
-function card(p, i) {
+function cardViejo(p, i) {
   const img = imgUrl(p.image_path);
   return `<article class="card" style="--i:${i}"><div class="foto">${img ? `<img src="${esc(img)}" alt="" loading="lazy">` : `<span>${esc(p.name.charAt(0))}</span>`}</div>
   <div class="info"><h3>${esc(p.name)}</h3><p>${esc(p.description)}</p><div class="pie"><b>${price(p.price_usd)}</b>
@@ -41,7 +41,7 @@ function ordersHtml() {
 function renderSheet() {
   const nota = $('#nota'); if (nota) S.nota = nota.value;
   const a = (v) => (S.view === v ? 'act' : '');
-  $('#panel').innerHTML = `<div class="stabs"><button data-view="cart" class="${a('cart')}">Tu pedido</button><button data-view="orders" class="${a('orders')}">Seguimiento</button><button data-close aria-label="Cerrar">✕</button></div>` + (S.view === 'cart' ? cartHtml() : ordersHtml());
+  $('#panel').innerHTML = `<div class="stabs"><button data-view="cart" class="${a('cart')}">Tu pedido</button><button data-view="orders" class="${a('orders')}">Seguimiento</button><button data-view="pagar" class="${a("pagar")}">Pagar</button><button data-close aria-label="Cerrar">✕</button></div>` + (S.view === 'cart' ? cartHtml() : S.view === 'pagar' ? pagarHtml() : ordersHtml());
 }
 async function refreshOrders() {
   try { S.orders = await rpc('get_table_orders', { p_token: token }); if (S.view === 'orders') renderSheet(); } catch (e) { if (S.view === 'orders') fail(e); }
@@ -109,7 +109,7 @@ function pagosHtml() {
   return '<h3 class="sub">Formas de pago</h3>' + lista.map((p) => `<div class="pago"><b>${esc(p.label)}</b><small>${p.currency === 'VES' ? 'Bolívares' : 'Dólares'}</small><p>${esc(p.instructions)}</p></div>`).join('');
 }
 async function cargarPagos() {
-  try { S.pagos = await select('payment_methods?select=label,currency,instructions&order=sort_order'); if (S.view) renderSheet(); } catch { /* sin formas de pago */ }
+  try { S.pagos = await select('payment_methods?select=id,kind,label,currency,instructions&order=sort_order'); if (S.view) renderSheet(); } catch { /* sin formas de pago */ }
 }
 cargarPagos();
 function exito() {
@@ -119,3 +119,116 @@ function exito() {
   document.body.appendChild(d);
   setTimeout(() => d.remove(), 1500);
 }
+
+import { uploadEvidence } from './api.js';
+
+Object.assign(ERR, {
+  payer_name_invalid: 'Escribe tu nombre completo.',
+  payer_doc_invalid: 'Revisa tu cédula.',
+  amount_invalid: 'El monto no es válido.',
+  no_open_check: 'Aún no tienes consumo para pagar.',
+  method_invalid: 'Esa forma de pago ya no está disponible.',
+  evidence_invalid: 'No se pudo adjuntar el comprobante.',
+});
+
+const EMOJI = [[/combo/i, '🍱'], [/hamburg/i, '🍔'], [/perro|hot ?dog/i, '🌭'], [/pizza/i, '🍕'], [/papa|frita|aros/i, '🍟'], [/brownie|helado|postre/i, '🍰'], [/refresc|malta|jugo|papel[oó]n|bebida/i, '🥤'], [/teque/i, '🧀'], [/pabell/i, '🍛']];
+const icono = (p) => {
+  const cat = (S.cats.find((c) => c.id === p.category_id) || {}).name || '';
+  const hit = EMOJI.find(([r]) => r.test(p.name) || r.test(cat));
+  return hit ? hit[1] : '🍽️';
+};
+function card(p, i) {
+  const img = imgUrl(p.image_path);
+  return `<article class="card" style="--i:${i}"><div class="foto">${img ? `<img src="${esc(img)}" alt="${esc(p.name)}" loading="lazy">` : `<span class="emo">${icono(p)}</span>`}${p.available ? '' : '<span class="agot">Agotado</span>'}</div>
+  <div class="info"><h3>${esc(p.name)}</h3><p>${esc(p.description)}</p><div class="pie"><div class="pr"><b>${fmtUsd(p.price_usd)}</b>${S.rate ? `<small>${fmtVes(p.price_usd * S.rate)}</small>` : ''}</div>${p.available ? `<button class="add" data-add="${esc(p.id)}" aria-label="Agregar ${esc(p.name)}">+</button>` : ''}</div></div></article>`;
+}
+
+const esEfectivo = (m) => m && (m.kind === 'efectivo_usd' || m.kind === 'efectivo_ves');
+const metodoSel = () => { const el = $('#pg-m'); return el ? (S.pagos || []).find((p) => p.id === el.value) : null; };
+
+function pagarHtml() {
+  const c = S.cuenta;
+  if (S.pagoOk) return '<div class="okpago"><h3>¡Pago enviado!</h3><p class="hint">Lo estamos verificando. El mesero te confirmará en breve.</p><button class="ghost" data-pagonuevo>Registrar otro pago</button></div>';
+  if (!c) return '<p class="vacio">Cargando tu cuenta…</p>';
+  if (!c.check_id) return '<p class="vacio">Todavía no tienes consumo en esta mesa.</p>';
+  const ms = S.pagos || [];
+  if (!ms.length) return '<p class="vacio">Aún no hay formas de pago configuradas. Pide ayuda al mesero.</p>';
+  const m0 = ms[0], bal = Number(c.balance_usd), ves = S.rate ? bal * S.rate : null;
+  const monto0 = (m0.currency === 'VES' && S.rate ? bal * S.rate : bal).toFixed(2);
+  return `<div class="resumen"><div><small>Total</small><b>${fmtUsd(c.total_usd)}</b></div><div><small>Pagado</small><b>${fmtUsd(c.paid_usd)}</b></div><div class="debe"><small>Por pagar</small><b>${fmtUsd(bal)}</b>${ves ? `<em>${fmtVes(ves)}</em>` : ''}</div></div>
+  <h3 class="sub">Datos del pago</h3>
+  <label class="campo">Forma de pago<select id="pg-m">${ms.map((p) => `<option value="${esc(p.id)}">${esc(p.label)}</option>`).join('')}</select></label>
+  <div class="pago"><p id="pg-info">${esc(m0.instructions)}</p></div>
+  <label class="campo">Nombre completo<input id="pg-n" autocomplete="name" maxlength="120" placeholder="Como aparece en tu cédula"></label>
+  <div class="campo"><span>Cédula</span><div class="dos"><select id="pg-t"><option>V</option><option>E</option><option>J</option><option>G</option><option>P</option></select><input id="pg-d" inputmode="numeric" maxlength="10" placeholder="12345678"></div></div>
+  <label class="campo"><span id="pg-mon">${m0.currency === 'VES' ? 'Monto en bolívares (Bs.)' : 'Monto en dólares (USD)'}</span><input id="pg-a" inputmode="decimal" value="${monto0}"></label>
+  <label class="campo">Número de referencia<input id="pg-r" maxlength="80" placeholder="Últimos dígitos de la operación"></label>
+  <label class="campo" id="pg-fl" ${esEfectivo(m0) ? 'hidden' : ''}>Foto del comprobante<input id="pg-f" type="file" accept="image/*"></label>
+  <p class="hint">Tus datos solo los ve el personal del restaurante para verificar el pago.</p>
+  <button class="cta" data-enviarpago>Enviar pago para verificación</button>`;
+}
+
+function actualizarMetodo() {
+  const m = metodoSel();
+  if (!m) return;
+  const bal = S.cuenta ? Number(S.cuenta.balance_usd) : 0;
+  $('#pg-info').textContent = m.instructions || '';
+  $('#pg-a').value = (m.currency === 'VES' && S.rate ? bal * S.rate : bal).toFixed(2);
+  $('#pg-mon').textContent = m.currency === 'VES' ? 'Monto en bolívares (Bs.)' : 'Monto en dólares (USD)';
+  $('#pg-fl').hidden = esEfectivo(m);
+}
+
+async function cargarCuenta() {
+  try { S.cuenta = await rpc('get_table_check', { p_token: token }); if (S.view === 'pagar') renderSheet(); } catch (e) { fail(e); }
+}
+
+async function reducirFoto(file) {
+  const bmp = await createImageBitmap(file);
+  const k = Math.min(1, 1000 / Math.max(bmp.width, bmp.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(bmp.width * k);
+  c.height = Math.round(bmp.height * k);
+  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+  return new Promise((ok, no) => c.toBlob((b) => (b ? ok(b) : no(new Error('No se pudo procesar la foto'))), 'image/jpeg', 0.82));
+}
+
+async function enviarPago() {
+  const m = metodoSel();
+  const nombre = $('#pg-n').value.trim();
+  const doc = $('#pg-t').value + '-' + $('#pg-d').value.replace(/\D/g, '');
+  const monto = Number(String($('#pg-a').value).replace(',', '.'));
+  const ref = $('#pg-r').value.trim();
+  const archivo = $('#pg-f').files[0];
+  const efectivo = esEfectivo(m);
+  if (!m) return toast('Elige una forma de pago.');
+  if (nombre.length < 3) return toast('Escribe tu nombre completo.');
+  if (!/^[VEJGP]-\d{5,10}$/.test(doc)) return toast('Revisa tu cédula.');
+  if (!(monto > 0)) return toast('Escribe el monto pagado.');
+  if (!efectivo && !ref) return toast('Escribe el número de referencia.');
+  if (!efectivo && !archivo) return toast('Adjunta la foto del comprobante.');
+  const btn = $('[data-enviarpago]');
+  btn.disabled = true;
+  let id;
+  try {
+    id = await rpc('submit_payment', { p_token: token, p_method_id: m.id, p_amount: monto, p_reference: ref, p_payer_name: nombre, p_payer_doc: doc });
+  } catch (e) { fail(e); btn.disabled = false; return; }
+  try {
+    if (archivo) {
+      const blob = await reducirFoto(archivo);
+      const path = `${id}/${Date.now()}.jpg`;
+      await uploadEvidence(path, blob);
+      await rpc('attach_evidence', { p_payment_id: id, p_path: path, p_mime: 'image/jpeg', p_size: blob.size });
+    }
+  } catch { toast('El pago se registró, pero la foto no se pudo subir. Avisa al mesero.'); }
+  S.pagoOk = true;
+  exito();
+  renderSheet();
+  cargarCuenta();
+}
+
+document.addEventListener('click', (e) => {
+  if (e.target.closest('[data-view="pagar"]')) cargarCuenta();
+  if (e.target.closest('[data-pagonuevo]')) { S.pagoOk = false; renderSheet(); }
+  if (e.target.closest('[data-enviarpago]')) enviarPago();
+});
+document.addEventListener('change', (e) => { if (e.target.id === 'pg-m') actualizarMetodo(); });

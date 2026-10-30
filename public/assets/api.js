@@ -45,3 +45,13 @@ export async function upload(path, blob) {
   });
   if (!res.ok) throw new Error('No se pudo subir la foto (' + res.status + ')');
 }
+export async function uploadEvidence(path, blob) {
+  const headers = { apikey: K, 'Content-Type': blob.type };
+  if (jwt) headers.Authorization = 'Bearer ' + jwt;
+  const res = await fetch(`${U}/storage/v1/object/payment-evidence/${path}`, { method: 'POST', headers, body: blob });
+  if (!res.ok) throw new Error('No se pudo subir el comprobante (' + res.status + ')');
+}
+export async function signedUrl(path) {
+  const r = await call('/storage/v1/object/sign/payment-evidence/' + path, { method: 'POST', body: JSON.stringify({ expiresIn: 300 }) });
+  return U + '/storage/v1' + r.signedURL;
+}
