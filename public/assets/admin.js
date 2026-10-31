@@ -272,3 +272,106 @@ setInterval(() => { if (!$('#panel-admin').hidden) vigilarPagos(); }, 20000);
     catch { setJwt(null); try { sessionStorage.removeItem('ik_jwt_admin'); } catch { /* nada */ } }
   }
 })();
+
+import { borrarArchivos } from './api.js';
+
+let limpiarDias = '30';
+const corteISO = () => new Date(Date.now() - Number(limpiarDias) * 864e5).toISOString();
+
+function confirmarEscribiendo({ titulo, texto, clave, ok }) {
+  return new Promise((resolve) => {
+    const d = document.createElement('div');
+    d.className = 'visor dlg';
+    d.innerHTML = `<div class="vcard dlgc" role="dialog" aria-modal="true"><h3>${esc(titulo)}</h3><p class="hint">${esc(texto)}</p><input id="lp-clave" autocomplete="off" placeholder="Escribe ${esc(clave)} para confirmar"><div class="acc dlga"><button class="ghost" data-x="no">Cancelar</button><button class="cta peligro" data-x="si" disabled>${esc(ok)}</button></div></div>`;
+    const btn = d.querySelector('[data-x="si"]');
+    const inp = d.querySelector('input');
+    inp.addEventListener('input', () => { btn.disabled = inp.value.trim().toUpperCase() !== clave; });
+    const cerrar = (v) => { d.remove(); resolve(v); };
+    d.addEventListener('click', (e) => {
+      if (e.target === d) return cerrar(false);
+      const b = e.target.closest('[data-x]');
+      if (!b) return undefined;
+      return cerrar(b.dataset.x === 'si' && !b.disabled);
+    });
+    document.body.appendChild(d);
+    inp.focus();
+  });
+}
+
+VISTAS.limpieza = async function () {
+  const p = await rpc('purge_preview', { p_before: corteISO() });
+  const op = [['0', 'Todo lo ya cerrado'], ['7', 'Más de 7 días'], ['30', 'Más de 30 días'], ['90', 'Más de 90 días']]
+    .map(([v, t]) => `<option value="${v}" ${v === limpiarDias ? 'selected' : ''}>${t}</option>`).join('');
+  return `<h2>Limpieza de datos</h2><p class="hint">Libera espacio borrando información vieja. Las mesas con cuenta abierta o pedidos en curso nunca se tocan. Lo borrado no se puede recuperar.</p><label class="campo">Borrar lo anterior a<select id="lp-d">${op}</select></label>
+  <article class="mesa-card"><h3>Comprobantes de pago</h3><p class="hint">Borra solo las fotos de comprobantes ya aprobados o rechazados. Los pagos, montos y datos del pagador se conservan. Es lo que más espacio libera.</p><div class="kpis" style="grid-template-columns:1fr"><div><small>Se borrarán</small><b>${Number(p.comprobantes)}</b></div></div><button class="cta" data-limpiar="comprobantes" ${Number(p.comprobantes) ? '' : 'disabled'}>Borrar comprobantes</button></article>
+  <article class="mesa-card"><h3>Cuentas cerradas</h3><p class="hint">Borra las cuentas ya pagadas con sus pedidos, pagos y comprobantes. Descarga primero un respaldo.</p><div class="kpis" style="grid-template-columns:1fr"><div><small>Se borrarán</small><b>${Number(p.cuentas)}</b></div></div><button class="ghost" data-respaldo>Descargar respaldo (CSV)</button><button class="cta peligro" style="margin-top:10px" data-limpiar="cuentas" ${Number(p.cuentas) ? '' : 'disabled'}>Borrar cuentas cerradas</button></article>`;
+};
+
+async function limpiar(modo) {
+  const cuentas = modo === 'cuentas';
+  const ok = await confirmarEscribiendo({
+    titulo: cuentas ? 'Borrar cuentas cerradas' : 'Borrar comprobantes',
+    texto: cuentas ? 'Se borrarán las cuentas pagadas con sus pedidos, pagos y comprobantes. No se puede deshacer.' : 'Se borrarán las fotos de comprobantes ya revisados. Los pagos se conservan. No se puede deshacer.',
+    clave: 'BORRAR',
+    ok: 'Borrar definitivamente',
+  });
+  if (!ok) return;
+  toast('Borrando…');
+  const cut = corteISO();
+  try {
+    const lista = await rpc('purge_candidates', { p_mode: cuentas ? 'cuentas' : 'comprobantes', p_before: cut });
+    if (lista.length) {
+      await borrarArchivos('payment-evidence', lista.map((x) => x.storage_path));
+      await rpc('purge_evidence_records', { p_ids: lista.map((x) => x.id) });
+    }
+    if (cuentas) {
+      const r = await rpc('purge_closed_checks', { p_before: cut });
+      toast(`Listo: ${r.cuentas} cuentas, ${r.pedidos} pedidos y ${r.pagos} pagos borrados`);
+    } else {
+      toast(`Listo: ${lista.length} comprobantes borrados`);
+    }
+    render();
+  } catch (err) {
+    toast('No se pudo completar: ' + (err.message === 'evidence_pending' ? 'Quedan comprobantes por borrar; repite la limpieza.' : motivo(err)));
+  }
+}
+
+async function respaldo() {
+  const cut = corteISO();
+  const rows = await select(`checks?select=closed_at,dining_tables(number),orders(status,total_usd,total_ves,order_items(product_name,quantity)),payments(status,currency,amount,reference,payer_name,payer_doc,payment_methods(label))&status=eq.pagada&closed_at=lt.${encodeURIComponent(cut)}&order=closed_at.asc&limit=1000`);
+  if (!rows.length) { toast('No hay cuentas para respaldar con ese filtro.'); return; }
+  const out = [['cierre', 'mesa', 'total_usd', 'total_bs', 'platos', 'pagos']];
+  rows.forEach((c) => {
+    const os = (c.orders || []).filter((o) => o.status !== 'cancelado');
+    const plat = {};
+    os.forEach((o) => (o.order_items || []).forEach((i) => { plat[i.product_name] = (plat[i.product_name] || 0) + Number(i.quantity); }));
+    out.push([
+      new Date(c.closed_at).toLocaleString('es-VE'),
+      c.dining_tables ? c.dining_tables.number : '',
+      os.reduce((s, o) => s + Number(o.total_usd), 0).toFixed(2),
+      os.reduce((s, o) => s + Number(o.total_ves), 0).toFixed(2),
+      Object.entries(plat).map(([n, q]) => q + 'x ' + n).join('; '),
+      (c.payments || []).map((p) => [p.payment_methods ? p.payment_methods.label : '', p.payer_name, p.payer_doc, 'ref ' + (p.reference || ''), (p.currency === 'VES' ? 'Bs ' : 'USD ') + p.amount, p.status].join(' | ')).join(' / '),
+    ]);
+  });
+  const celda = (v) => { let s = String(v ?? ''); if (/^[=+\-@]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; };
+  const blob = new Blob(['\ufeff' + out.map((r) => r.map(celda).join(',')).join('\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'respaldo-cuentas.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast(`Respaldo descargado: ${rows.length} cuentas`);
+}
+
+document.addEventListener('click', async (e) => {
+  const t = e.target.closest('[data-limpiar],[data-respaldo]');
+  if (!t) return;
+  try {
+    if ('respaldo' in t.dataset) await respaldo();
+    else await limpiar(t.dataset.limpiar);
+  } catch (err) { toast('No se pudo completar: ' + motivo(err)); }
+});
+document.addEventListener('change', (e) => { if (e.target.id === 'lp-d') { limpiarDias = e.target.value; render(); } });

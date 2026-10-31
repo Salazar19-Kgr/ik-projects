@@ -74,3 +74,11 @@ export function dialogo({ titulo, texto = '', campo = false, ok = 'Aceptar', can
     if (t) t.focus();
   });
 }
+export async function borrarArchivos(bucket, paths) {
+  const res = await fetch(`${U}/storage/v1/object/${bucket}`, {
+    method: 'DELETE',
+    headers: { apikey: K, Authorization: 'Bearer ' + jwt, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prefixes: paths }),
+  });
+  if (!res.ok) throw new Error('No se pudieron borrar los archivos (' + res.status + ')');
+}
