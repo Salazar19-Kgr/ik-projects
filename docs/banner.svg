@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="320" viewBox="0 0 1200 320" role="img" aria-label="Plataforma para restaurante">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2E6B55"/>
+      <stop offset="1" stop-color="#1E2B25"/>
+    </linearGradient>
+    <radialGradient id="r" cx=".88" cy=".15" r=".6">
+      <stop offset="0" stop-color="#C4623A" stop-opacity=".6"/>
+      <stop offset="1" stop-color="#C4623A" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="320" rx="24" fill="url(#g)"/>
+  <rect width="1200" height="320" rx="24" fill="url(#r)"/>
+  <g fill="none" stroke="#FBF7F0" stroke-opacity=".09" stroke-width="2">
+    <circle cx="1030" cy="70" r="170"/>
+    <circle cx="1030" cy="70" r="125"/>
+    <circle cx="1030" cy="70" r="80"/>
+  </g>
+  <circle cx="1030" cy="70" r="34" fill="#FBF7F0" fill-opacity=".14"/>
+  <text x="72" y="128" font-family="Georgia, 'Times New Roman', serif" font-size="66" font-weight="700" fill="#FBF7F0">Plataforma para restaurante</text>
+  <text x="74" y="184" font-family="Helvetica, Arial, sans-serif" font-size="27" fill="#E3F0E9">Menú por QR  ·  Cocina en vivo  ·  Pagos en USD y bolívares</text>
+  <g font-family="Helvetica, Arial, sans-serif" font-size="19" font-weight="700" text-anchor="middle">
+    <rect x="74" y="226" width="140" height="42" rx="21" fill="#C4623A"/>
+    <text x="144" y="253" fill="#fff">10 mesas</text>
+    <rect x="228" y="226" width="170" height="42" rx="21" fill="#FBF7F0" fill-opacity=".16"/>
+    <text x="313" y="253" fill="#FBF7F0">Sin instalar nada</text>
+    <rect x="412" y="226" width="210" height="42" rx="21" fill="#FBF7F0" fill-opacity=".16"/>
+    <text x="517" y="253" fill="#FBF7F0">Panel de control</text>
+  </g>
+</svg>
