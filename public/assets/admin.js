@@ -35,7 +35,7 @@ async function render() {
   document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('act', b.dataset.tab === tab));
   const v = $('#vista');
   try { v.innerHTML = await VISTAS[tab](); } catch (e) { v.innerHTML = '<p class="vacio">No se pudo cargar: ' + esc(motivo(e)) + '</p>'; }
-  if (tab === 'pedidos') timer = setInterval(render, 10000);
+  if (tab === 'pedidos' || tab === 'cobros') timer = setInterval(render, 10000);
 }
 
 async function entrar(jwt) {
@@ -199,3 +199,107 @@ document.addEventListener('click', async (e) => {
     render();
   } catch (err) { toast('No se pudo completar: ' + motivo(err)); }
 });
+
+const PAGOS = new Map();
+let cobroFiltro = 'abierta';
+let pendAnt = -1;
+const porRevisar = (p) => p.status === 'en_revision' || p.status === 'pendiente';
+const montoPago = (p) => (p.currency === 'VES' ? fmtVes(p.amount) : fmtUsd(p.amount)) + ' (≈ ' + fmtUsd(p.amount_usd) + ')';
+
+function filaPago(p) {
+  const conFoto = (p.payment_evidence || []).length > 0;
+  return `<div class="pg"><div class="pg-top"><b>${esc(p.payment_methods ? p.payment_methods.label : 'Pago')}</b><span class="est ${esc(p.status)}">${esc(ESTADOS_PAGO[p.status] || p.status)}</span></div><div class="pg-d"><span>${esc(p.payer_name || '—')} · ${esc(p.payer_doc || '—')}</span><span>${esc(montoPago(p))}</span><span>Ref. ${esc(p.reference || '—')} · ${esc(new Date(p.created_at).toLocaleString('es-VE'))}</span></div><div class="acc" style="justify-content:flex-start;margin-top:8px"><button class="mini" data-visor="${esc(p.id)}">${conFoto ? 'Ver comprobante y datos' : 'Ver datos'}</button>${porRevisar(p) ? `<button class="mini" data-vaprobar="${esc(p.id)}">Aprobar</button><button class="mini off" data-vrechazar="${esc(p.id)}">Rechazar</button>` : ''}</div></div>`;
+}
+
+VISTAS.cobros = async function () {
+  const rows = await select('checks?select=id,status,opened_at,dining_tables(number,label),orders(id,status,total_usd,total_ves,order_items(product_name,quantity)),payments(id,amount,currency,amount_usd,reference,status,payer_name,payer_doc,created_at,reviewed_at,payment_methods(label),payment_evidence(storage_path))&status=in.(abierta,pagada)&order=opened_at.desc&limit=60');
+  PAGOS.clear();
+  const hoy = new Date().toDateString();
+  let porCobrar = 0, cobradoHoy = 0, porVerificar = 0;
+  const tarjetas = [];
+  rows.forEach((c) => {
+    const mesa = c.dining_tables ? (c.dining_tables.label || 'Mesa ' + c.dining_tables.number) : 'Mesa';
+    const ords = (c.orders || []).filter((o) => o.status !== 'cancelado');
+    const total = ords.reduce((s, o) => s + Number(o.total_usd), 0);
+    const totalVes = ords.reduce((s, o) => s + Number(o.total_ves), 0);
+    const pagos = c.payments || [];
+    const pagado = pagos.filter((p) => p.status === 'aprobado').reduce((s, p) => s + Number(p.amount_usd), 0);
+    pagos.forEach((p) => {
+      PAGOS.set(p.id, { ...p, mesa });
+      if (porRevisar(p)) porVerificar++;
+      if (p.status === 'aprobado' && p.reviewed_at && new Date(p.reviewed_at).toDateString() === hoy) cobradoHoy += Number(p.amount_usd);
+    });
+    const debe = Math.max(total - pagado, 0);
+    if (c.status === 'abierta') porCobrar += debe;
+    if (c.status !== cobroFiltro) return;
+    const resumen = {};
+    ords.forEach((o) => (o.order_items || []).forEach((i) => { resumen[i.product_name] = (resumen[i.product_name] || 0) + Number(i.quantity); }));
+    const platos = Object.entries(resumen);
+    const nPlatos = platos.reduce((s, [, q]) => s + q, 0);
+    const pct = total > 0 ? Math.min(100, Math.round((pagado / total) * 100)) : 0;
+    tarjetas.push(`<article class="mesa-card" style="--i:${tarjetas.length}"><div class="mesa-top"><h3>${esc(mesa)}</h3><span class="est ${c.status === 'abierta' ? 'en_revision' : ''}">${c.status === 'abierta' ? 'Por cobrar' : 'Pagada'}</span></div><small class="hint">${nPlatos} ${nPlatos === 1 ? 'plato' : 'platos'} · abierta ${esc(new Date(c.opened_at).toLocaleString('es-VE'))}</small><div class="platos">${platos.map(([n, q]) => `<span class="chip-plato"><b>${q}×</b> ${esc(n)}</span>`).join('') || '<small class="hint">Sin pedidos</small>'}</div><div class="resumen"><div><small>Total</small><b>${fmtUsd(total)}</b><em>${fmtVes(totalVes)}</em></div><div><small>Pagado</small><b>${fmtUsd(pagado)}</b></div><div class="debe"><small>Por pagar</small><b>${fmtUsd(debe)}</b></div></div><div class="barra"><i style="--p:${pct}%"></i></div><small class="hint">${pct}% pagado</small>${pagos.map(filaPago).join('')}</article>`);
+  });
+  const b = document.querySelector('[data-tab="cobros"]');
+  if (b) b.textContent = porVerificar ? `Cobros (${porVerificar})` : 'Cobros';
+  return `<h2>Cobros</h2><div class="kpis"><div><small>Por cobrar</small><b>${fmtUsd(porCobrar)}</b></div><div><small>Cobrado hoy</small><b>${fmtUsd(cobradoHoy)}</b></div><div><small>Por verificar</small><b>${porVerificar}</b></div></div><div class="seg"><button data-cfiltro="abierta" class="${cobroFiltro === 'abierta' ? 'act' : ''}">Mesas por cobrar</button><button data-cfiltro="pagada" class="${cobroFiltro === 'pagada' ? 'act' : ''}">Pagadas</button></div>${tarjetas.join('') || '<p class="vacio">No hay mesas en esta lista.</p>'}`;
+};
+
+function datosPago(p) {
+  const f = [['Pagador', p.payer_name], ['Cédula', p.payer_doc], ['Mesa', p.mesa], ['Forma de pago', p.payment_methods && p.payment_methods.label], ['Monto', montoPago(p)], ['Referencia', p.reference], ['Enviado', new Date(p.created_at).toLocaleString('es-VE')], ['Estado', ESTADOS_PAGO[p.status] || p.status]];
+  return '<dl>' + f.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v || '—')}</dd></div>`).join('') + '</dl>';
+}
+
+async function abrirVisor(id) {
+  const p = PAGOS.get(id);
+  if (!p) return;
+  const ev = (p.payment_evidence || [])[0];
+  const d = document.createElement('div');
+  d.className = 'visor';
+  d.innerHTML = `<div class="vcard"><button class="vx" data-vcerrar aria-label="Cerrar">✕</button><div class="vimg">${ev ? '<small class="hint">Cargando comprobante…</small>' : '<p class="vacio">Este pago no tiene foto de comprobante.</p>'}</div><div class="vdatos">${datosPago(p)}</div>${porRevisar(p) ? `<div class="acc" style="justify-content:flex-start;margin-top:14px"><button class="cta" style="flex:1;margin:0" data-vaprobar="${esc(p.id)}">Aprobar pago</button><button class="mini off" data-vrechazar="${esc(p.id)}">Rechazar</button></div>` : ''}</div>`;
+  document.body.appendChild(d);
+  if (!ev) return;
+  const caja = () => d.querySelector('.vimg');
+  try {
+    const url = await signedUrl(ev.storage_path);
+    const im = new Image();
+    im.alt = 'Comprobante de pago';
+    im.onload = () => { if (caja()) caja().replaceChildren(im); };
+    im.onerror = () => { if (caja()) caja().textContent = 'No se pudo mostrar la imagen.'; };
+    im.src = url;
+  } catch (err) { if (caja()) caja().textContent = 'No se pudo cargar el comprobante: ' + motivo(err); }
+}
+
+async function revisar(id, aprobar) {
+  let nota = null;
+  if (aprobar) { if (!confirm('¿Confirmas que el dinero ya llegó a tu cuenta?')) return; }
+  else { nota = prompt('Motivo del rechazo (opcional):'); if (nota === null) return; }
+  try {
+    await rpc('review_payment', { p_payment_id: id, p_approve: aprobar, p_note: nota });
+    toast(aprobar ? 'Pago aprobado' : 'Pago rechazado');
+    const v = document.querySelector('.visor');
+    if (v) v.remove();
+    render();
+  } catch (err) { toast('No se pudo completar: ' + motivo(err)); }
+}
+
+document.addEventListener('click', (e) => {
+  if (e.target.classList && e.target.classList.contains('visor')) { e.target.remove(); return; }
+  const t = e.target.closest('[data-visor],[data-vaprobar],[data-vrechazar],[data-cfiltro],[data-vcerrar]');
+  if (!t) return;
+  const d = t.dataset;
+  if ('vcerrar' in d) { const v = document.querySelector('.visor'); if (v) v.remove(); return; }
+  if ('cfiltro' in d) { cobroFiltro = d.cfiltro; render(); return; }
+  if ('visor' in d) { abrirVisor(d.visor); return; }
+  revisar(d.vaprobar || d.vrechazar, 'vaprobar' in d);
+});
+
+async function vigilarPagos() {
+  try {
+    const r = await select('payments?select=id&status=in.(en_revision,pendiente)');
+    const b = document.querySelector('[data-tab="cobros"]');
+    if (b) b.textContent = r.length ? `Cobros (${r.length})` : 'Cobros';
+    if (pendAnt >= 0 && r.length > pendAnt) toast('Nuevo pago por verificar');
+    pendAnt = r.length;
+  } catch { /* sin sesión todavía */ }
+}
+setInterval(() => { if (!$('#panel-admin').hidden) vigilarPagos(); }, 20000);
