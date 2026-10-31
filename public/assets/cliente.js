@@ -38,7 +38,7 @@ function ordersHtmlViejo() {
   const list = S.orders.length ? S.orders.map((o) => `<div class="ped ${esc(o.status)}"><div class="ph"><b>Pedido #${Number(o.number)}</b><span class="est">${ESTADOS[o.status] || esc(o.status)}</span></div><ul>${o.items.map((i) => `<li>${Number(i.quantity)}× ${esc(i.name)}</li>`).join('')}</ul><small>Total ${fmtUsd(o.total_usd)} · ${fmtVes(o.total_ves)}</small></div>`).join('') : '<p class="vacio">Todavía no tienes pedidos en esta mesa.</p>';
   return list + pagosHtml() + '<button class="ghost" data-call>Llamar al mesero</button>';
 }
-function renderSheet() {
+function renderSheetViejo() {
   const nota = $('#nota'); if (nota) S.nota = nota.value;
   const a = (v) => (S.view === v ? 'act' : '');
   $('#panel').innerHTML = `<div class="stabs"><button data-view="cart" class="${a('cart')}">Tu pedido</button><button data-view="orders" class="${a('orders')}">Seguimiento</button><button data-view="pagar" class="${a("pagar")}">Pagar</button><button data-close aria-label="Cerrar">✕</button></div>` + pasoTitulo() + (S.view === 'cart' ? cartHtml() : S.view === 'pagar' ? pagarHtml() : ordersHtml());
@@ -356,3 +356,39 @@ function actualizarPrev() {
 document.addEventListener('input', (e) => { if (e.target.id === 'pg-n' || e.target.id === 'pg-d') actualizarPrev(); });
 document.addEventListener('change', (e) => { if (e.target.id === 'pg-t') actualizarPrev(); });
 setInterval(() => { if (S.view === 'pagar' && S.pagoOk) cargarCuenta(); }, 8000);
+
+const TITULOS = { cart: 'Tu pedido', orders: 'Seguimiento', pagar: 'Pagar cuenta' };
+function renderSheet() {
+  const nota = $('#nota'); if (nota) S.nota = nota.value;
+  $('#panel').innerHTML = `<div class="stabs"><h3 class="stitulo">${TITULOS[S.view] || ''}</h3><button data-close aria-label="Cerrar">✕</button></div>` + pasoTitulo() + (S.view === 'cart' ? cartHtml() : S.view === 'pagar' ? pagarHtml() : ordersHtml());
+}
+
+const FASES = { recibido: ['Recibido', 25], en_preparacion: ['Preparando', 50], listo: ['¡Listo!', 75], entregado: ['Entregado', 100] };
+const prevEstado = {};
+function avisoListo() {
+  toast('¡Tu pedido está listo!');
+  try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch { /* sin vibración */ }
+}
+function actualizarProg() {
+  const b = $('#prog');
+  if (!b) return;
+  const lista = (S.orders || []).filter((o) => o.status !== 'cancelado');
+  if (!lista.length) { b.hidden = true; return; }
+  const activos = lista.filter((o) => o.status !== 'entregado');
+  const o = activos[0] || lista[0];
+  const [txt, pct] = FASES[o.status] || ['Pedido', 0];
+  const min = Math.max(0, Math.floor((Date.now() - new Date(o.created_at).getTime()) / 60000));
+  lista.forEach((x) => {
+    if (prevEstado[x.id] && prevEstado[x.id] !== x.status && x.status === 'listo') avisoListo();
+    prevEstado[x.id] = x.status;
+  });
+  const firma = [o.status, o.number, min, activos.length].join('|');
+  b.hidden = false;
+  if (b.dataset.f === firma) return;
+  b.dataset.f = firma;
+  b.className = 'fab-prog ' + o.status;
+  const C = 2 * Math.PI * 15;
+  const sub = activos.length > 1 ? activos.length + ' pedidos en curso' : o.status === 'entregado' ? 'Que lo disfrutes' : 'Pedido #' + Number(o.number) + ' · ' + min + ' min';
+  b.innerHTML = `<svg viewBox="0 0 36 36" width="40" height="40" aria-hidden="true"><circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,.28)" stroke-width="3.5"/><circle cx="18" cy="18" r="15" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C * (1 - pct / 100)).toFixed(1)}" transform="rotate(-90 18 18)"/></svg><span><b>${txt}</b><small>${sub}</small></span>`;
+}
+setInterval(actualizarProg, 1500);
