@@ -55,3 +55,22 @@ export async function signedUrl(path) {
   const r = await call('/storage/v1/object/sign/payment-evidence/' + path, { method: 'POST', body: JSON.stringify({ expiresIn: 300 }) });
   return U + '/storage/v1' + r.signedURL;
 }
+export function dialogo({ titulo, texto = '', campo = false, ok = 'Aceptar', cancelar = 'Cancelar', peligro = false }) {
+  return new Promise((resolve) => {
+    const d = document.createElement('div');
+    d.className = 'visor';
+    d.innerHTML = `<div class="vcard dlgc" role="dialog" aria-modal="true"><h3>${esc(titulo)}</h3><p class="hint">${esc(texto)}</p>${campo ? '<textarea maxlength="300" placeholder="Escribe aquí (opcional)"></textarea>' : ''}<div class="acc dlga"><button class="ghost" data-x="no">${esc(cancelar)}</button><button class="cta ${peligro ? 'peligro' : ''}" data-x="si">${esc(ok)}</button></div></div>`;
+    const cerrar = (v) => { d.remove(); resolve(v); };
+    d.addEventListener('click', (e) => {
+      if (e.target === d) return cerrar(null);
+      const b = e.target.closest('[data-x]');
+      if (!b) return undefined;
+      if (b.dataset.x === 'no') return cerrar(null);
+      const t = d.querySelector('textarea');
+      return cerrar(t ? t.value.trim() : true);
+    });
+    document.body.appendChild(d);
+    const t = d.querySelector('textarea');
+    if (t) t.focus();
+  });
+}

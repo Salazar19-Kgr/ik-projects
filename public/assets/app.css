@@ -215,3 +215,17 @@ main.lista{max-width:1000px;display:grid;gap:14px;grid-template-columns:repeat(a
 .vdatos dl div{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--borde);padding-bottom:6px}
 .vdatos dt{color:var(--suave);font-size:13px}
 .vdatos dd{margin:0;font-weight:600;text-align:right}
+.dlgc{max-width:400px}
+.dlgc h3{font-size:22px;margin-bottom:6px}
+.dlga{margin-top:16px;justify-content:flex-end;gap:10px}
+.dlga button{margin:0;width:auto;padding:12px 20px}
+.cta.peligro{background:var(--terra)}
+.idprev{margin-top:8px;display:flex;gap:10px;align-items:center;background:var(--papel);border:1px dashed var(--borde);border-radius:14px;padding:10px 12px;animation:subir .3s both}
+.idprev.ok{border-style:solid;border-color:var(--verde);background:var(--verde2)}
+.idprev .chk{flex:0 0 28px;height:28px;border-radius:50%;background:var(--borde);color:var(--suave);display:grid;place-items:center;font-weight:700}
+.idprev.ok .chk{background:var(--verde);color:#fff}
+.idprev small{display:block;color:var(--suave);font-weight:400;font-size:12px}
+.idprev b{font-size:15px;color:var(--tinta)}
+.exito-inline svg circle{stroke-dasharray:151;stroke-dashoffset:151;animation:trazo .6s .1s forwards}
+.exito-inline svg path{stroke-dasharray:40;stroke-dashoffset:40;animation:trazo .4s .6s forwards}
+@media (prefers-reduced-motion:reduce){.exito-inline svg *{stroke-dashoffset:0!important}}

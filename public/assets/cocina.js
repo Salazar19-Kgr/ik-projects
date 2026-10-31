@@ -101,7 +101,7 @@ document.addEventListener('click', async (e) => {
   if (t.dataset.col) { tab = t.dataset.col; return cargar(); }
   const a = t.dataset.a;
   let razon = null;
-  if (a === 'cancelado') { razon = prompt('Motivo de la cancelación:'); if (!razon) return; }
+  if (a === 'cancelado') { razon = await dialogo({ titulo: 'Cancelar pedido', texto: 'Escribe el motivo de la cancelación.', campo: true, ok: 'Cancelar pedido', peligro: true }); if (!razon) return; }
   t.disabled = true;
   try {
     await rpc('advance_order_status', { p_order_id: t.dataset.mover, p_new_status: a, p_reason: razon });
@@ -135,3 +135,4 @@ function tarjeta(o) {
   }).join('');
   return `<article class="tk ${m >= 15 ? 'tarde' : m >= 8 ? 'medio' : ''}"><div class="th"><b>${esc(mesa)}</b><span>#${Number(o.order_number)} · hace ${m} min</span></div><ul>${items}</ul>${o.notes ? `<p class="nota-pedido">Nota del pedido: ${esc(o.notes)}</p>` : ''}<div class="acc">${botones(o)}</div></article>`;
 }
+import { dialogo } from './api.js';

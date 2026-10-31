@@ -269,7 +269,7 @@ async function abrirVisor(id) {
   } catch (err) { if (caja()) caja().textContent = 'No se pudo cargar el comprobante: ' + motivo(err); }
 }
 
-async function revisar(id, aprobar) {
+async function revisarViejo(id, aprobar) {
   let nota = null;
   if (aprobar) { if (!confirm('¿Confirmas que el dinero ya llegó a tu cuenta?')) return; }
   else { nota = prompt('Motivo del rechazo (opcional):'); if (nota === null) return; }
@@ -303,3 +303,23 @@ async function vigilarPagos() {
   } catch { /* sin sesión todavía */ }
 }
 setInterval(() => { if (!$('#panel-admin').hidden) vigilarPagos(); }, 20000);
+
+import { dialogo } from './api.js';
+
+async function revisar(id, aprobar) {
+  let nota = null;
+  if (aprobar) {
+    const si = await dialogo({ titulo: 'Aprobar pago', texto: '¿Confirmas que el dinero ya llegó a tu cuenta? Esta acción no se puede deshacer.', ok: 'Sí, aprobar' });
+    if (!si) return;
+  } else {
+    nota = await dialogo({ titulo: 'Rechazar pago', texto: 'Cuéntale al cliente por qué (opcional).', campo: true, ok: 'Rechazar pago', peligro: true });
+    if (nota === null) return;
+  }
+  try {
+    await rpc('review_payment', { p_payment_id: id, p_approve: aprobar, p_note: nota });
+    toast(aprobar ? 'Pago aprobado' : 'Pago rechazado');
+    const v = document.querySelector('.visor');
+    if (v) v.remove();
+    render();
+  } catch (err) { toast('No se pudo completar: ' + motivo(err)); }
+}

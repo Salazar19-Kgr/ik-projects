@@ -146,7 +146,7 @@ function card(p, i) {
 const esEfectivo = (m) => m && (m.kind === 'efectivo_usd' || m.kind === 'efectivo_ves');
 const metodoSel = () => { const el = $('#pg-m'); return el ? (S.pagos || []).find((p) => p.id === el.value) : null; };
 
-function pagarHtml() {
+function pagarHtmlViejo() {
   const c = S.cuenta;
   if (S.pagoOk) return '<div class="okpago"><h3>¡Pago enviado!</h3><p class="hint">Lo estamos verificando. El mesero te confirmará en breve.</p><button class="ghost" data-pagonuevo>Registrar otro pago</button></div>';
   if (!c) return '<p class="vacio">Cargando tu cuenta…</p>';
@@ -160,7 +160,7 @@ function pagarHtml() {
   <label class="campo">Forma de pago<select id="pg-m">${ms.map((p) => `<option value="${esc(p.id)}">${esc(p.label)}</option>`).join('')}</select></label>
   <div class="pago"><p id="pg-info">${esc(m0.instructions)}</p></div>
   <label class="campo">Nombre completo<input id="pg-n" autocomplete="name" maxlength="120" placeholder="Como aparece en tu cédula"></label>
-  <div class="campo"><span>Cédula</span><div class="dos"><select id="pg-t"><option>V</option><option>E</option><option>J</option><option>G</option><option>P</option></select><input id="pg-d" inputmode="numeric" maxlength="10" placeholder="12345678"></div></div>
+  <div class="campo"><span>Cédula</span><div class="dos"><select id="pg-t"><option>V</option><option>E</option><option>J</option><option>G</option><option>P</option></select><input id="pg-d" inputmode="numeric" maxlength="10" placeholder="12345678"></div><div class="idprev" id="pg-prev" hidden></div></div>
   <label class="campo"><span id="pg-mon">${m0.currency === 'VES' ? 'Monto en bolívares (Bs.)' : 'Monto en dólares (USD)'}</span><input id="pg-a" inputmode="decimal" value="${monto0}"></label>
   <label class="campo">Número de referencia<input id="pg-r" maxlength="80" placeholder="Últimos dígitos de la operación"></label>
   <label class="campo" id="pg-fl" ${esEfectivo(m0) ? 'hidden' : ''}>Foto del comprobante<input id="pg-f" type="file" accept="image/*"></label>
@@ -332,3 +332,27 @@ if (token) {
   }, 400);
   setTimeout(() => clearInterval(espera), 15000);
 }
+
+function pagarHtml() {
+  const c = S.cuenta;
+  if (c && !c.check_id && c.pagada) {
+    return '<div class="okpago exito-inline"><svg viewBox="0 0 52 52" width="84" height="84"><circle cx="26" cy="26" r="24" fill="none" stroke="#2E6B55" stroke-width="3"/><path d="M15 27l8 8 14-16" fill="none" stroke="#2E6B55" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg><h3>¡Cuenta pagada!</h3><p class="hint">Gracias por tu visita. Si tu pedido aún no llegó, síguelo en «Seguimiento».</p></div>';
+  }
+  return pagarHtmlViejo();
+}
+
+function actualizarPrev() {
+  const box = $('#pg-prev');
+  if (!box) return;
+  const n = ($('#pg-n').value || '').trim();
+  const d = ($('#pg-d').value || '').replace(/\D/g, '');
+  const t = $('#pg-t').value;
+  if (!n && !d) { box.hidden = true; return; }
+  const listo = d.length >= 5 && n.length >= 3;
+  box.hidden = false;
+  box.className = 'idprev' + (listo ? ' ok' : '');
+  box.innerHTML = `<span class="chk">${listo ? '✓' : '…'}</span><div><small>Se registrará a nombre de</small><b>${esc(n.toUpperCase() || '—')}</b><small>${esc(t)}-${esc(d || '—')}</small></div>`;
+}
+document.addEventListener('input', (e) => { if (e.target.id === 'pg-n' || e.target.id === 'pg-d') actualizarPrev(); });
+document.addEventListener('change', (e) => { if (e.target.id === 'pg-t') actualizarPrev(); });
+setInterval(() => { if (S.view === 'pagar' && S.pagoOk) cargarCuenta(); }, 8000);
